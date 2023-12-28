@@ -1,6 +1,6 @@
 # jdk version found here
-# https://developer.ibm.com/languages/java/semeru-runtimes/downloads
-# 17.0.9.0 OpenJDK 17.0.9+9 OpenJ9 0.41.0
+# https://adoptium.net/temurin/releases/?version=17&os=windows&arch=x64&package=jdk
+# jdk-17.0.9+9.1
 
 # add include to jni hook
 target_include_directories(jnihook PUBLIC

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(minecraft_utility)
+project(minecraft_mod_cpp)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 11)
@@ -9,9 +9,12 @@ if (NOT WIN32)
     message(FATAL_ERROR "This library only works on windows")
 endif ()
 
-add_library(minecraft_utility SHARED
+add_library(${PROJECT_NAME} SHARED
         dll_entry.cpp
 )
+
+# sources
+add_subdirectory(srcs)
 
 # dependencies
 set(LIB_COMMAND_PARSER off)
@@ -29,7 +32,7 @@ add_subdirectory(dependencies/jnihook)
 add_subdirectory(dependencies/jni)
 add_subdirectory(dependencies/minhook)
 
-target_link_libraries(minecraft_utility PRIVATE
+target_link_libraries(${PROJECT_NAME} PRIVATE
         custom_lib
         jnihook
         minhook
