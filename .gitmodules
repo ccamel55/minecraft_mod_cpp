@@ -1,0 +1,9 @@
+[submodule "dependencies/jnihook"]
+	path = dependencies/jnihook
+	url = git@github.com:rdbo/jnihook.git
+[submodule "dependencies/custom_lib"]
+	path = dependencies/custom_lib
+	url = git@github.com:ccamel55/custom_lib.git
+[submodule "dependencies/minhook"]
+	path = dependencies/minhook
+	url = git@github.com:TsudaKageyu/minhook.git
