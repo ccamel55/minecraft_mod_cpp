@@ -1,5 +1,6 @@
 target_sources(${PROJECT_NAME} PRIVATE
         instance.cpp
+        menu.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

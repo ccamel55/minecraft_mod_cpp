@@ -1,4 +1,5 @@
 #include <instance.hpp>
+#include <menu.hpp>
 #include <utils.hpp>
 
 #include <cassert>
@@ -32,6 +33,7 @@ namespace
                     static_cast<int>(GET_X_LPARAM(lParam)),
                     static_cast<int>(GET_Y_LPARAM(lParam))};
 
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_MOUSEWHEEL:
@@ -43,6 +45,7 @@ namespace
                     0,
                     GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA};
 
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_KEYDOWN:
@@ -52,6 +55,7 @@ namespace
                 input.key = utils::win32_to_input_key(static_cast<UINT>(wParam));
                 input.state = true;
 
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_KEYUP:
@@ -61,6 +65,7 @@ namespace
                 input.key = utils::win32_to_input_key(static_cast<UINT>(wParam));
                 input.state = false;
 
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_LBUTTONDOWN:
@@ -70,6 +75,7 @@ namespace
                 input.key = lib::input::key_button::mouseleft;
 
                 input.state = msg == WM_LBUTTONDOWN;
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_RBUTTONDOWN:
@@ -79,6 +85,7 @@ namespace
                 input.key = lib::input::key_button::mouseright;
 
                 input.state = msg == WM_RBUTTONDOWN;
+                instance::get().input_handler->add_input(input);
                 break;
             }
         case WM_MBUTTONDOWN:
@@ -88,13 +95,23 @@ namespace
                 input.key = lib::input::key_button::mousemiddle;
 
                 input.state = msg == WM_MBUTTONDOWN;
+                instance::get().input_handler->add_input(input);
                 break;
             }
         default:
-            return CallWindowProcA(original_wndproc, hWnd, msg, wParam, lParam);
+            break;
         }
 
-        instance::get().input_handler->add_input(input);
+        if (menu::get().is_open())
+        {
+            // enable cursor, if we are in game the cursor is disable dy default
+            if (msg == WM_SETCURSOR && LOWORD(lParam) == HTCLIENT)
+            {
+                SetCursor(LoadCursor(nullptr, IDC_ARROW));
+            }
+
+            return true;
+        }
 
         return CallWindowProcA(original_wndproc, hWnd, msg, wParam, lParam);
     }
@@ -117,23 +134,27 @@ namespace
         // update render context if we fullscreen/alt tab
         if (new_context == nullptr) [[unlikely]]
         {
+            window_handle = WindowFromDC(hDc);
+            assert(window_handle);
+
+            original_wndproc = reinterpret_cast<WNDPROC>(
+                SetWindowLongPtrW(window_handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(wndproc_hook)));
+
+            // twe need to make a new contex to render stuff too
             new_context = wglCreateContext(hDc);
             wglMakeCurrent(hDc, new_context);
             {
                 render->bind_api(nullptr);
                 render->build_texture();
-
-                render->register_callback([](lib::rendering::renderer& render)
-                {
-                    render.draw_rect_filled({0, 0}, {100, 100}, {255, 255, 0, 255});
-                });
             }
             wglMakeCurrent(hDc, original_context);
             return original_swap_buffers(hDc);
         }
 
+        // we need to get our viewport before binding our new context as we want to get the games viewport
         glGetIntegerv(GL_VIEWPORT, viewport);
 
+        // rebind our context to draw our stuff onto it
         wglMakeCurrent(hDc, new_context);
         {
             if (viewport[2] != last_viewport[2] || viewport[3] != last_viewport[3]) [[unlikely]]
@@ -145,6 +166,7 @@ namespace
                 last_viewport[3] = viewport[3];
 
                 instance::get().renderer->set_window_size({last_viewport[2], last_viewport[3]});
+                menu::update_screen_size({last_viewport[2], last_viewport[3]});
             }
 
             render->draw_frame();
@@ -173,12 +195,16 @@ void instance::attatch()
     lib_log_d("found jvm: {}", reinterpret_cast<uintptr_t>(jvm));
     lib_log_d("found jni instance: {}", reinterpret_cast<uintptr_t>(jni_env));
 
+    menu::get().init();
+
     attatch_native_hooks();
     attatch_jni_hooks();
 }
 
 void instance::remove()
 {
+    menu::get().destroy();
+
     remove_native_hooks();
     remove_jni_hooks();
 
@@ -196,12 +222,6 @@ void instance::remove()
 void instance::attatch_native_hooks()
 {
     lib_log_d("attatching native hooks");
-
-    window_handle = FindWindow("GLFW30", nullptr);
-    assert(window_handle != nullptr);
-
-    original_wndproc = reinterpret_cast<WNDPROC>(
-        SetWindowLongPtrW(window_handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(wndproc_hook)));
 
     assert(MH_Initialize() == MH_OK);
 
