@@ -14,6 +14,8 @@ add_library(${PROJECT_NAME} SHARED
 )
 
 # sources
+add_subdirectory(jni)
+add_subdirectory(minecraft_sdk)
 add_subdirectory(srcs)
 
 # dependencies

@@ -1,8 +1,10 @@
 #include <instance.hpp>
 #include <menu.hpp>
 #include <utils.hpp>
+#include <minecraft_sdk.hpp>
 
 #include <cassert>
+#include <java.hpp>
 #include <thread>
 
 #include <Windows.h>
@@ -131,14 +133,23 @@ namespace
         const auto original_context = wglGetCurrentContext();
         const auto& render = instance::get().renderer;
 
-        // update render context if we fullscreen/alt tab
-        if (new_context == nullptr) [[unlikely]]
+        // get window handle
+        if (const auto current_window_handle = WindowFromDC(hDc);
+            current_window_handle != window_handle) [[unlikely]]
         {
-            window_handle = WindowFromDC(hDc);
+            lib_log_d("rehooking wndproc");
+
+            window_handle = current_window_handle;
             assert(window_handle);
 
             original_wndproc = reinterpret_cast<WNDPROC>(
                 SetWindowLongPtrW(window_handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(wndproc_hook)));
+        }
+
+        // update render context if we fullscreen/alt tab
+        if (new_context == nullptr) [[unlikely]]
+        {
+            lib_log_d("creating new render context");
 
             // twe need to make a new contex to render stuff too
             new_context = wglCreateContext(hDc);
@@ -195,6 +206,9 @@ void instance::attatch()
     lib_log_d("found jvm: {}", reinterpret_cast<uintptr_t>(jvm));
     lib_log_d("found jni instance: {}", reinterpret_cast<uintptr_t>(jni_env));
 
+    java::init(jni_env);
+    sdk::init_sdk(jni_env);
+
     menu::get().init();
 
     attatch_native_hooks();
@@ -203,6 +217,8 @@ void instance::attatch()
 
 void instance::remove()
 {
+    sdk::destroy_sdk(jni_env);
+    java::destroy(jni_env);
     menu::get().destroy();
 
     remove_native_hooks();
